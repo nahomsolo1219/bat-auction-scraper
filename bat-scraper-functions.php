@@ -1,110 +1,173 @@
 <?php
+if (!defined('ABSPATH')) exit; // Exit if accessed directly
 
-// Fetch initial auction data (Fast)
+function fetchHTML($url) {
+    $response = wp_remote_get($url, array('timeout' => 15));
+    if (is_wp_error($response)) {
+        error_log("ERROR: Failed to fetch URL - " . $url . " - " . $response->get_error_message());
+        return false;
+    }
+    return wp_remote_retrieve_body($response);
+}
+
+function extractFirstImageFromContent($content) {
+    if (preg_match('/<img.*?src=["\'](.*?)["\']/', $content, $matches)) {
+        return $matches[1];
+    }
+    return 'https://via.placeholder.com/150?text=Image+Not+Found';
+}
+
+function getAuctionDetailsFromPage($url) {
+    error_log("DEBUG: Fetching auction details from $url");
+    $html = fetchHTML($url);
+
+    if (!$html) {
+        error_log("ERROR: Failed to fetch auction page.");
+        return [
+            'bid' => 'N/A',
+            'time_left' => 'N/A',
+            'country' => 'Unknown',
+            'seller_name' => 'Unknown',
+            'seller_link' => '#',
+            'make' => 'N/A',
+            'model' => 'N/A',
+            'era' => 'N/A',
+            'origin' => 'N/A',
+            'category' => 'N/A',
+            'dealer_type' => 'N/A'
+        ];
+    }
+
+    // Extracting bid price
+    preg_match('/<strong class="info-value">(.*?)<\/strong>/', $html, $bidMatch);
+    $bid = $bidMatch[1] ?? 'N/A';
+
+    // Extracting time left
+    // Extract auction end timestamp
+preg_match('/data-until=["\'](\d+)["\']/', $html, $timeUntilMatch);
+$time_until = $timeUntilMatch[1] ?? null;
+
+if ($time_until) {
+    $current_time = time(); // Get current Unix timestamp
+    $time_remaining = $time_until - $current_time; // Calculate remaining time in seconds
+
+    if ($time_remaining > 0) {
+        $hours = floor($time_remaining / 3600);
+        $minutes = floor(($time_remaining % 3600) / 60);
+        $seconds = $time_remaining % 60;
+        $time_left = sprintf("%02d:%02d:%02d", $hours, $minutes, $seconds);
+    } else {
+        $time_left = "Auction Ended";
+    }
+} else {
+    $time_left = "N/A";
+}
+
+
+    // Extracting country
+    preg_match('/<span class="show-country-name">(.*?)<\/span>/', $html, $countryMatch);
+    $country = $countryMatch[1] ?? 'Unknown';
+
+    // Extracting seller details
+    preg_match('/<a href="(https:\/\/bringatrailer.com\/member\/.*?)"[^>]*>(.*?)<\/a>/', $html, $sellerMatch);
+    $seller_name = $sellerMatch[2] ?? 'Unknown';
+    $seller_link = $sellerMatch[1] ?? '#';
+
+    // Extracting Make, Model, Era, Origin, Category
+    $details = ['make' => 'N/A', 'model' => 'N/A', 'era' => 'N/A', 'origin' => 'N/A', 'category' => 'N/A'];
+    preg_match_all('/<button class="group-title"><strong class="group-title-label">(.*?)<\/strong>(.*?)<\/button>/', $html, $matches, PREG_SET_ORDER);
+
+    foreach ($matches as $match) {
+        $label = trim($match[1]);
+        $value = trim(strip_tags($match[2]));
+
+        if ($label === 'Make') $details['make'] = $value;
+        if ($label === 'Model') $details['model'] = $value;
+        if ($label === 'Era') $details['era'] = $value;
+        if ($label === 'Origin') $details['origin'] = $value;
+        if ($label === 'Category') $details['category'] = $value;
+    }
+
+    // Extracting Dealer Type
+    preg_match('/<div class="item additional"><strong>Private Party or Dealer<\/strong>: (.*?)<\/div>/', $html, $dealerMatch);
+    $dealer_type = trim($dealerMatch[1] ?? 'N/A');
+
+    return [
+        'bid' => $bid,
+        'time_left' => $time_left,
+        'time_end' => time() + ($hours * 3600) + ($minutes * 60), // Pass auction end time,
+        'country' => $country,
+        'seller_name' => $seller_name,
+        'seller_link' => $seller_link,
+        'make' => $details['make'],
+        'model' => $details['model'],
+        'era' => $details['era'],
+        'origin' => $details['origin'],
+        'category' => $details['category'],
+        'dealer_type' => $dealer_type
+    ];
+}
+
 function bat_fetch_auctions() {
-    $rss_url = "https://bringatrailer.com/auctions/feed/";
-    $rss = simplexml_load_file($rss_url, 'SimpleXMLElement', LIBXML_NOCDATA);
+    error_log("DEBUG: AJAX function triggered.");
+
+    if (!defined('DOING_AJAX') || !DOING_AJAX) {
+        error_log("ERROR: Not a valid AJAX request.");
+        wp_send_json_error(["error" => "Invalid request."]);
+        wp_die();
+    }
+
+    $rss_url = "https://bringatrailer.com/feed/";
+    $rss_data = fetchHTML($rss_url);
+
+    if (!$rss_data) {
+        error_log("ERROR: Failed to fetch RSS data.");
+        wp_send_json_error(["error" => "Failed to load auctions"]);
+        wp_die();
+    }
+
+    error_log("DEBUG: Successfully fetched RSS feed.");
+
+    libxml_use_internal_errors(true);
+    $rss = simplexml_load_string($rss_data, 'SimpleXMLElement', LIBXML_NOCDATA);
+    libxml_clear_errors();
+
+    if (!$rss) {
+        error_log("ERROR: Failed to parse RSS XML.");
+        wp_send_json_error(["error" => "Failed to parse auction data"]);
+        wp_die();
+    }
 
     $auctions = [];
-
     foreach ($rss->channel->item as $item) {
         $title = (string) $item->title;
         $link = (string) $item->link;
         $content = (string) $item->children('content', true)->encoded;
 
-        // Extract first image
-        $imageURL = extractFirstImageFromContent($content);
-        
-        // Extract country details
-        $countryData = extractCountryFromContent($content);
-        
-        // Extract additional data like Year & Transmission
-        $carDetails = extractCarDetailsFromTitle($title);
+        error_log("DEBUG: Processing auction - $title");
 
-        $auctions[] = [
+        $imageURL = extractFirstImageFromContent($content);
+        error_log("DEBUG: Extracted Image - $imageURL");
+
+        $details = getAuctionDetailsFromPage($link);
+        error_log("DEBUG: Extracted auction details from page - $title");
+
+        $auctions[] = array_merge([
             'image' => $imageURL,
             'name' => $title,
-            'year' => $carDetails['year'],
-            'transmission' => $carDetails['transmission'],
-            'link' => $link,
-            'flag' => $countryData['flag'],
-            'country' => $countryData['country']
-        ];
+            'link' => $link
+        ], $details);
     }
 
-    echo json_encode($auctions);
+    error_log("DEBUG: Successfully processed all auctions.");
+    wp_send_json_success($auctions);
     wp_die();
-}
-
-// Fetch auction details (Slow, done separately via AJAX)
-function bat_fetch_auction_details() {
-    $url = isset($_GET['url']) ? esc_url($_GET['url']) : '';
-    if (!$url) {
-        echo json_encode(['bid' => 'N/A', 'time_left' => 'N/A', 'time_until' => 0]);
-        wp_die();
-    }
-
-    $details = getAuctionDetails($url);
-    echo json_encode($details);
-    wp_die();
-}
-
-// Extract first image from RSS
-function extractFirstImageFromContent($content) {
-    preg_match('/<img[^>]+src=["\'](.*?)["\']/', $content, $matches);
-    return isset($matches[1]) ? $matches[1] : 'https://via.placeholder.com/150?text=No+Image';
-}
-
-// Extract country details
-function extractCountryFromContent($content) {
-    preg_match('/<img[^>]*class=["\']countries-flags["\'][^>]*src=["\'](.*?)["\']/', $content, $flagMatch);
-    preg_match('/<span[^>]*class=["\']show-country-name["\'][^>]*>(.*?)<\/span>/', $content, $countryMatch);
-
-    return [
-        'flag' => $flagMatch[1] ?? 'https://via.placeholder.com/20x15?text=?',
-        'country' => $countryMatch[1] ?? 'Unknown'
-    ];
-}
-
-// Extract car year & transmission from title
-function extractCarDetailsFromTitle($title) {
-    preg_match('/\b(19|20)\d{2}\b/', $title, $yearMatch);
-    $year = isset($yearMatch[0]) ? $yearMatch[0] : 'Unknown';
-
-    $transmission = (strpos(strtolower($title), 'manual') !== false) ? 'Manual' : 'Automatic';
-
-    return [
-        'year' => $year,
-        'transmission' => $transmission
-    ];
-}
-
-// Fetch auction time & bid price
-function getAuctionDetails($url) {
-    $html = fetchHTML($url);
-    $dom = new DOMDocument();
-    @$dom->loadHTML($html);
-    $xpath = new DOMXPath($dom);
-
-    $timeNode = $xpath->query("//span[contains(@class, 'listing-available-countdown')]");
-    $bidNode = $xpath->query("//span[contains(@data-listing-currently, '')]//strong[contains(@class, 'info-value')]");
-
-    $timeText = 'Loading...';
-    $timeUntil = 0;
-    $bidPrice = 'N/A';
-
-    if ($timeNode->length > 0) {
-        $timeText = trim($timeNode->item(0)->nodeValue);
-    }
-
-    if ($bidNode->length > 0) {
-        $bidPrice = trim($bidNode->item(0)->nodeValue);
-    }
-
-    return ['bid' => $bidPrice, 'time_left' => $timeText, 'time_until' => $timeUntil];
 }
 
 add_action('wp_ajax_bat_fetch_auctions', 'bat_fetch_auctions');
 add_action('wp_ajax_nopriv_bat_fetch_auctions', 'bat_fetch_auctions');
-add_action('wp_ajax_bat_fetch_auction_details', 'bat_fetch_auction_details');
-add_action('wp_ajax_nopriv_bat_fetch_auction_details', 'bat_fetch_auction_details');
+
+// Optional: Manual testing endpoint
+if (isset($_GET['test_bat_ajax'])) {
+    bat_fetch_auctions();
+}
