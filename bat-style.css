@@ -1,21 +1,212 @@
+/* General Table Styles */
 #bat-auction-table {
     width: 100%;
     border-collapse: collapse;
-    margin-top: 20px;
+    font-family: Arial, sans-serif;
+    background: #fff;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
 }
 
-#bat-auction-table th, #bat-auction-table td {
-    border: 1px solid #ddd;
-    padding: 8px;
-    text-align: left;
+/* Table Header */
+#bat-auction-table thead {
+    background: #333;
+    color: #fff;
+    text-transform: uppercase;
+    font-size: 14px;
 }
 
 #bat-auction-table th {
-    background-color: #f4f4f4;
+    padding: 12px;
+    text-align: left;
+    border-bottom: 2px solid #444;
+    cursor: pointer; /* Indicate clickable headers for sorting */
+}
+
+#bat-auction-table th.asc::after {
+    content: ' ↑';
+}
+
+#bat-auction-table th.desc::after {
+    content: ' ↓';
+}
+
+/* Table Body */
+#bat-auction-table tbody tr {
+    border-bottom: 1px solid #ddd;
+    transition: background 0.3s ease-in-out;
+}
+
+#bat-auction-table tbody tr:hover {
+    background: #f9f9f9;
+}
+
+/* Table Cells */
+#bat-auction-table td {
+    padding: 10px;
+    font-size: 14px;
+    color: #333;
+}
+
+/* Car Image */
+#bat-auction-table td img {
+    border-radius: 6px;
+    box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1);
+    width: 80px;
+    height: auto;
+}
+
+/* Hyperlinks (Seller, View) */
+#bat-auction-table td a {
+    color: #007bff;
+    text-decoration: none;
     font-weight: bold;
 }
 
-#bat-auction-table img {
-    border-radius: 5px;
-    display: block;
+#bat-auction-table td a:hover {
+    text-decoration: underline;
+}
+
+/* Countdown Timer */
+.countdown {
+    font-weight: bold;
+    color: #d9534f; /* Red for urgency */
+}
+
+/* Filter Bar */
+#bat-filters {
+    display: flex;
+    align-items: center;
+    gap: 10px; /* Space between elements */
+    margin-bottom: 20px;
+    flex-wrap: wrap; /* Wrap on small screens */
+}
+
+/* Search Input */
+#bat-search {
+    width: 200px; /* Smaller width */
+    padding: 8px 12px;
+    font-family: Arial, sans-serif;
+    font-size: 14px;
+    border: 1px solid #ddd;
+    border-radius: 20px; /* Rounded edges for modern look */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    transition: all 0.3s ease;
+}
+
+#bat-search:focus {
+    border-color: #007bff;
+    box-shadow: 0 2px 8px rgba(0, 123, 255, 0.2);
+    outline: none;
+}
+
+/* Filter Dropdowns */
+#bat-country-filter, 
+#bat-make-filter, 
+#bat-dealer-filter {
+    width: 150px; /* Smaller width */
+    padding: 8px;
+    font-family: Arial, sans-serif;
+    font-size: 14px;
+    border: 1px solid #ddd;
+    border-radius: 20px;
+    background: #fff;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+#bat-country-filter:hover, 
+#bat-make-filter:hover, 
+#bat-dealer-filter:hover {
+    border-color: #007bff;
+}
+
+/* Bid Range Inputs */
+#bat-bid-min, 
+#bat-bid-max {
+    width: 80px; /* Smaller width */
+    padding: 8px;
+    font-family: Arial, sans-serif;
+    font-size: 14px;
+    border: 1px solid #ddd;
+    border-radius: 20px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    transition: all 0.3s ease;
+}
+
+#bat-bid-min:focus, 
+#bat-bid-max:focus {
+    border-color: #007bff;
+    box-shadow: 0 2px 8px rgba(0, 123, 255, 0.2);
+    outline: none;
+}
+
+/* Bid Range Container */
+#bat-filters > div {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 14px;
+    color: #333;
+}
+
+/* Adjust for Small Screens */
+@media (max-width: 768px) {
+    #bat-auction-table th, 
+    #bat-auction-table td {
+        font-size: 12px;
+        padding: 8px;
+    }
+
+    #bat-auction-table td img {
+        width: 60px;
+    }
+
+    #bat-search {
+        width: 150px;
+    }
+
+    #bat-country-filter, 
+    #bat-make-filter, 
+    #bat-dealer-filter {
+        width: 120px;
+    }
+
+    #bat-bid-min, 
+    #bat-bid-max {
+        width: 60px;
+    }
+}
+/* Pagination */
+#bat-pagination button {
+    padding: 8px 16px;
+    margin: 0 5px;
+    background: #007bff;
+    color: #fff;
+    border: none;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: background 0.3s ease;
+}
+
+#bat-pagination button:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+}
+
+#bat-pagination button:hover:not(:disabled) {
+    background: #0056b3;
+}
+
+#bat-pagination span {
+    font-size: 14px;
+    margin: 0 10px;
+    color: #333;
+}
+/* Add to existing bat-style.css */
+td.loading {
+    color: #888;
+    font-style: italic;
 }
