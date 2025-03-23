@@ -24,6 +24,7 @@ function getAuctionDetailsFromPage($url) {
         return [
             'bid' => 'N/A',
             'time_left' => 'N/A',
+            'time_end' => 0,
             'country' => 'Unknown',
             'seller_name' => 'Unknown',
             'seller_link' => '#',
@@ -56,12 +57,13 @@ function getAuctionDetailsFromPage($url) {
         }
     } else {
         $time_left = "N/A";
+        $time_until = 0;
     }
 
     preg_match('/<span class="show-country-name">(.*?)<\/span>/', $html, $countryMatch);
     $country = $countryMatch[1] ?? 'Unknown';
 
-    preg_match('/<a href="(https:\/\/bringatrailer.com\/member\/.*?)"[^>]*>(.*?)<\/a>/', $html, $sellerMatch);
+    preg_match('/<strong>Seller<\/strong>:\s*<a href="(https:\/\/bringatrailer.com\/member\/.*?)"[^>]*>(.*?)<\/a>/', $html, $sellerMatch);
     $seller_name = $sellerMatch[2] ?? 'Unknown';
     $seller_link = $sellerMatch[1] ?? '#';
 
@@ -84,7 +86,7 @@ function getAuctionDetailsFromPage($url) {
     return [
         'bid' => $bid,
         'time_left' => $time_left,
-        'time_end' => $time_until ?? (time() + (isset($hours) ? $hours * 3600 : 0) + (isset($minutes) ? $minutes * 60 : 0)),
+        'time_end' => $time_until,
         'country' => $country,
         'seller_name' => $seller_name,
         'seller_link' => $seller_link,
@@ -107,7 +109,7 @@ function bat_fetch_auctions() {
     $table_name = $wpdb->prefix . 'bat_auctions';
 
     // Fetch new auctions from RSS
-    $rss_url = "https://bringatrailer.com/feed/";
+    $rss_url = "https://bringatrailer.com/auctions/feed/";
     $rss_data = fetchHTML($rss_url);
 
     if ($rss_data) {
@@ -121,6 +123,8 @@ function bat_fetch_auctions() {
                 $link = (string) $item->link;
                 $content = (string) $item->children('content', true)->encoded;
                 $imageURL = extractFirstImageFromContent($content);
+                $pub_date = (string) $item->pubDate; // Extract pubDate
+                $pub_date = $pub_date ? date('Y-m-d H:i:s', strtotime($pub_date)) : null; // Convert to MySQL datetime format
 
                 // Check if auction exists
                 $exists = $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $table_name WHERE link = %s", $link));
@@ -142,9 +146,10 @@ function bat_fetch_auctions() {
                             'era' => 'Loading...',
                             'origin' => 'Loading...',
                             'category' => 'Loading...',
-                            'dealer_type' => 'Loading...'
+                            'dealer_type' => 'Loading...',
+                            'pub_date' => $pub_date // Store the publication date
                         ],
-                        ['%s', '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s']
+                        ['%s', '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s']
                     );
                     if ($result === false) {
                         error_log("DEBUG: Failed to insert auction $link - " . $wpdb->last_error);
@@ -160,8 +165,8 @@ function bat_fetch_auctions() {
         error_log("ERROR: Failed to fetch RSS feed.");
     }
 
-    // Return all stored auctions
-    $auctions = $wpdb->get_results("SELECT * FROM $table_name", ARRAY_A);
+    // Return all stored auctions, sorted by pub_date DESC (newest first)
+    $auctions = $wpdb->get_results("SELECT * FROM $table_name ORDER BY pub_date DESC", ARRAY_A);
     if (!$auctions) {
         wp_send_json_error(["error" => "No auctions found in database."]);
     } else {
@@ -198,4 +203,4 @@ function bat_fetch_auction_details() {
 add_action('wp_ajax_bat_fetch_auctions', 'bat_fetch_auctions');
 add_action('wp_ajax_nopriv_bat_fetch_auctions', 'bat_fetch_auctions');
 add_action('wp_ajax_bat_fetch_auction_details', 'bat_fetch_auction_details');
-add_action('wp_ajax_nopriv_bat_fetch_auction_details', 'bat_fetch_auction_details');            
+add_action('wp_ajax_nopriv_bat_fetch_auction_details', 'bat_fetch_auction_details');

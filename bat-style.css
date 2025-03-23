@@ -159,30 +159,28 @@ td.loading {
 }
 
 /* Pagination */
+#bat-pagination {
+    text-align: center;
+    margin-top: 20px;
+}
+
 #bat-pagination button {
-    padding: 8px 16px;
-    margin: 0 5px;
-    background: #007bff;
-    color: #fff;
-    border: none;
-    border-radius: 20px;
-    cursor: pointer;
-    transition: background 0.3s ease;
+    font-size: 14px;
+    border-radius: 4px;
+    transition: background-color 0.3s;
 }
 
 #bat-pagination button:disabled {
-    background: #ccc;
+    opacity: 0.5;
     cursor: not-allowed;
 }
 
-#bat-pagination button:hover:not(:disabled) {
-    background: #0056b3;
+#bat-pagination button:not(:disabled):hover {
+    background-color: #e0e0e0;
 }
 
-#bat-pagination span {
-    font-size: 14px;
-    margin: 0 10px;
-    color: #333;
+#bat-pagination button[style*="background: #007bff"] {
+    background-color: #0056b3 !important;
 }
 
 /* Mobile Responsiveness for Filter Bar Only */

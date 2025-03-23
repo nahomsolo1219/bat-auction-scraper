@@ -34,6 +34,7 @@ function bat_create_auction_table() {
         origin VARCHAR(100) DEFAULT 'N/A',
         category VARCHAR(100) DEFAULT 'N/A',
         dealer_type VARCHAR(100) DEFAULT 'N/A',
+        pub_date DATETIME DEFAULT NULL, -- New column for publication date
         PRIMARY KEY (id),
         UNIQUE KEY link (link)
     ) $charset_collate;";
@@ -92,11 +93,7 @@ function bat_auction_table() {
             </thead>
             <tbody></tbody>
         </table>
-        <div id="bat-pagination" style="margin-top: 20px; text-align: center;">
-            <button id="bat-prev" disabled>Previous</button>
-            <span id="bat-page-info"></span>
-            <button id="bat-next">Next</button>
-        </div>
+        <div id="bat-pagination" style="margin-top: 20px; text-align: center;"></div>
     </div>
     <script>
         jQuery(document).ready(function($) {
@@ -208,25 +205,73 @@ function bat_auction_table() {
 
             function updatePagination() {
                 const totalPages = Math.ceil(filteredData.length / rowsPerPage);
-                $('#bat-page-info').text(`Page ${currentPage} of ${totalPages}`);
-                $('#bat-prev').prop('disabled', currentPage === 1);
-                $('#bat-next').prop('disabled', currentPage === totalPages || totalPages === 0);
+                const paginationDiv = $('#bat-pagination');
+                paginationDiv.empty();
+
+                // Previous button (left arrow)
+                const prevButton = $('<button>&lt;</button>')
+                    .prop('disabled', currentPage === 1)
+                    .css({
+                        margin: '0 5px',
+                        padding: '5px 10px',
+                        border: '1px solid #ccc',
+                        background: currentPage === 1 ? '#f0f0f0' : '#fff',
+                        cursor: currentPage === 1 ? 'not-allowed' : 'pointer'
+                    })
+                    .on('click', function() {
+                        if (currentPage > 1) {
+                            currentPage--;
+                            renderTable();
+                        }
+                    });
+                paginationDiv.append(prevButton);
+
+                // Page numbers
+                const maxVisiblePages = 5; // Maximum number of page numbers to show at once
+                let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+                let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+
+                // Adjust startPage if we're near the end
+                if (endPage - startPage + 1 < maxVisiblePages) {
+                    startPage = Math.max(1, endPage - maxVisiblePages + 1);
+                }
+
+                // Add page numbers
+                for (let i = startPage; i <= endPage; i++) {
+                    const pageButton = $('<button>' + i + '</button>')
+                        .css({
+                            margin: '0 5px',
+                            padding: '5px 10px',
+                            border: '1px solid #ccc',
+                            background: currentPage === i ? '#007bff' : '#fff',
+                            color: currentPage === i ? '#fff' : '#000',
+                            cursor: 'pointer'
+                        })
+                        .on('click', function() {
+                            currentPage = i;
+                            renderTable();
+                        });
+                    paginationDiv.append(pageButton);
+                }
+
+                // Next button (right arrow)
+                const nextButton = $('<button>&gt;</button>')
+                    .prop('disabled', currentPage === totalPages || totalPages === 0)
+                    .css({
+                        margin: '0 5px',
+                        padding: '5px 10px',
+                        border: '1px solid #ccc',
+                        background: (currentPage === totalPages || totalPages === 0) ? '#f0f0f0' : '#fff',
+                        cursor: (currentPage === totalPages || totalPages === 0) ? 'not-allowed' : 'pointer'
+                    })
+                    .on('click', function() {
+                        if (currentPage < totalPages) {
+                            currentPage++;
+                            renderTable();
+                        }
+                    });
+                paginationDiv.append(nextButton);
             }
-
-            $('#bat-prev').on('click', function() {
-                if (currentPage > 1) {
-                    currentPage--;
-                    renderTable();
-                }
-            });
-
-            $('#bat-next').on('click', function() {
-                const totalPages = Math.ceil(filteredData.length / rowsPerPage);
-                if (currentPage < totalPages) {
-                    currentPage++;
-                    renderTable();
-                }
-            });
 
             function applyFilters() {
                 var searchTerm = $('#bat-search').val().toLowerCase();
